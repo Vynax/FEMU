@@ -39,8 +39,7 @@ static int oc20_lba_str(char *buf, FemuCtrl *n, NvmeNamespace *ns, uint64_t lba)
     chunk = OC20_LBA_GET_CHUNK(addrf, lba);
     sectr = OC20_LBA_GET_SECTR(addrf, lba);
 
-    return sprintf(buf, "lba 0x%016"PRIx64" pugrp %"PRIu8" punit %"PRIu8
-                   " chunk %"PRIu16" sectr %"PRIu32, lba, pugrp, punit, chunk,
+    return sprintf(buf, "lba 0x%016" PRIx64 " pugrp %" PRIu8 " punit %" PRIu8 " chunk %" PRIu16 " sectr %" PRIu32, lba, pugrp, punit, chunk,
                    sectr);
 }
 #endif
@@ -68,7 +67,8 @@ static uint16_t oc20_init_chunk_info(Oc20Namespace *lns)
     int sectors = lns->id_ctrl.geo.clba;
 
     Oc20AddrF addrf = lns->lbaf;
-    for (int i = 0; i < lns->chks_total; i++) {
+    for (int i = 0; i < lns->chks_total; i++)
+    {
         cs[i].state = OC20_CHUNK_FREE;
         cs[i].type = OC20_CHUNK_TYPE_SEQ;
         cs[i].wear_index = 0;
@@ -86,7 +86,8 @@ static Oc20CS *oc20_chunk_get_state(FemuCtrl *n, NvmeNamespace *ns, uint64_t lba
 {
     Oc20Namespace *lns = ns->state;
 
-    if (!oc20_lba_valid(n, ns, lba)) {
+    if (!oc20_lba_valid(n, ns, lba))
+    {
         return NULL;
     }
 
@@ -99,24 +100,29 @@ static uint16_t oc20_advance_wp(FemuCtrl *n, NvmeNamespace *ns, uint64_t lba,
     Oc20CS *chunk_meta;
 
     chunk_meta = oc20_chunk_get_state(n, req->ns, lba);
-    if (!chunk_meta) {
+    if (!chunk_meta)
+    {
         return NVME_INTERNAL_DEV_ERROR | NVME_DNR;
     }
 
-    if (chunk_meta->type == OC20_CHUNK_TYPE_RAN) {
+    if (chunk_meta->type == OC20_CHUNK_TYPE_RAN)
+    {
         /* do not modify the chunk state or write pointer for random chunks */
         return NVME_SUCCESS;
     }
 
-    if (chunk_meta->state == OC20_CHUNK_FREE) {
+    if (chunk_meta->state == OC20_CHUNK_FREE)
+    {
         chunk_meta->state = OC20_CHUNK_OPEN;
     }
 
-    if (chunk_meta->state != OC20_CHUNK_OPEN) {
+    if (chunk_meta->state != OC20_CHUNK_OPEN)
+    {
         return NVME_INTERNAL_DEV_ERROR | NVME_DNR;
     }
 
-    if ((chunk_meta->wp += nlb) == chunk_meta->cnlb) {
+    if ((chunk_meta->wp += nlb) == chunk_meta->cnlb)
+    {
         chunk_meta->state = OC20_CHUNK_CLOSED;
     }
 
@@ -137,20 +143,24 @@ static void oc20_parse_lba_list(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
     Oc20RwCmd *ocrw = (Oc20RwCmd *)cmd;
     Oc20Namespace *lns = ns->state;
     Oc20AddrF *addrf = &lns->lbaf;
-    uint16_t nlb  = le16_to_cpu(ocrw->nlb) + 1;
+    uint16_t nlb = le16_to_cpu(ocrw->nlb) + 1;
     int max_sec_per_rq = 64;
     uint64_t cur_pg_addr, prev_pg_addr = ~(0ULL);
     int secs_idx = -1;
     uint64_t lba;
 
     memset(bucket, 0, sizeof(Oc20AddrBucket) * max_sec_per_rq);
-    for (int i = 0; i < nlb; i++) {
+    for (int i = 0; i < nlb; i++)
+    {
         lba = ((uint64_t *)(req->slba))[i];
         cur_pg_addr = (lba & (~(lns->lbaf.sec_mask)));
-        if (cur_pg_addr == prev_pg_addr) {
+        if (cur_pg_addr == prev_pg_addr)
+        {
             /* Accessing another secotr in the same NAND page */
             bucket[secs_idx].cnt++;
-        } else {
+        }
+        else
+        {
             /* Accessing a new NAND page addr */
             secs_idx++;
             bucket[secs_idx].cnt++;
@@ -185,16 +195,19 @@ static int oc20_advance_status(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
     uint64_t lba;
 
     /* Erase */
-    if (opcode == OC20_CMD_VECT_ERASE) {
+    if (opcode == OC20_CMD_VECT_ERASE)
+    {
         /* FIXME: vector erase */
-        for (int i = 0; i < nlb; i++) {
+        for (int i = 0; i < nlb; i++)
+        {
             lba = ((uint64_t *)req->slba)[i];
             ch = OC20_LBA_GET_GROUP(addrf, lba);
             lun = OC20_LBA_GET_PUNIT(addrf, lba);
             lunid = ch * num_ch + lun;
 
             int64_t ts = advance_chip_timestamp(n, lunid, now, opcode, 0);
-            if (ts > req->expire_time) {
+            if (ts > req->expire_time)
+            {
                 req->expire_time = ts;
             }
         }
@@ -213,7 +226,8 @@ static int oc20_advance_status(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
     assert(opcode == NVME_CMD_READ || opcode == OC20_CMD_VECT_READ ||
            opcode == NVME_CMD_WRITE || opcode == OC20_CMD_VECT_WRITE);
     assert(secs_idx > 0);
-    for (int i = 0; i < secs_idx; i++) {
+    for (int i = 0; i < secs_idx; i++)
+    {
         lba = ((uint64_t *)(req->slba))[si];
         nb_secs_to_one_chip = addr_bucket[i].cnt;
         si += nb_secs_to_one_chip;
@@ -224,19 +238,23 @@ static int oc20_advance_status(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
 
         io_done_ts = 0;
         int64_t chnl_end_ts, chip_end_ts;
-        if (req->is_write) {
+        if (req->is_write)
+        {
             /* Write data needs to be transferred through the channel first */
             chnl_end_ts = advance_channel_timestamp(n, ch, now, opcode);
             /* Then issue NAND Program to the target flash chip */
             io_done_ts = advance_chip_timestamp(n, lunid, chnl_end_ts, opcode, 0);
-        } else {
+        }
+        else
+        {
             chip_end_ts = advance_chip_timestamp(n, lunid, now, opcode, 0);
             io_done_ts = advance_channel_timestamp(n, ch, chip_end_ts, opcode);
         }
 
         /* Coperd: the time need to emulate is (io_done_ts - now) */
         cur_time_need_to_emulate = io_done_ts - now;
-        if (cur_time_need_to_emulate > total_time_need_to_emulate) {
+        if (cur_time_need_to_emulate > total_time_need_to_emulate)
+        {
             total_time_need_to_emulate = cur_time_need_to_emulate;
         }
     }
@@ -254,7 +272,8 @@ static uint16_t oc20_rw_check_chunk_write(FemuCtrl *n, NvmeCmd *cmd,
     Oc20Namespace *lns = ns->state;
 
     Oc20CS *cnk = oc20_chunk_get_state(n, ns, lba);
-    if (!cnk) {
+    if (!cnk)
+    {
         lba &= ~lns->lbaf.sec_mask;
         return NVME_WRITE_FAULT | NVME_DNR;
     }
@@ -262,16 +281,20 @@ static uint16_t oc20_rw_check_chunk_write(FemuCtrl *n, NvmeCmd *cmd,
     uint32_t start_sectr = lba & lns->lbaf.sec_mask;
     uint32_t end_sectr = start_sectr + ws;
 
-    if (cnk->state & OC20_CHUNK_OFFLINE || cnk->state & OC20_CHUNK_CLOSED) {
+    if (cnk->state & OC20_CHUNK_OFFLINE || cnk->state & OC20_CHUNK_CLOSED)
+    {
         return NVME_WRITE_FAULT | NVME_DNR;
     }
 
-    if (end_sectr > cnk->cnlb) {
+    if (end_sectr > cnk->cnlb)
+    {
         return NVME_WRITE_FAULT | NVME_DNR;
     }
 
-    if (cnk->type == OC20_CHUNK_TYPE_RAN) {
-        if (cnk->state != OC20_CHUNK_OPEN) {
+    if (cnk->type == OC20_CHUNK_TYPE_RAN)
+    {
+        if (cnk->state != OC20_CHUNK_OPEN)
+        {
             return NVME_WRITE_FAULT | NVME_DNR;
         }
 
@@ -290,7 +313,8 @@ static uint16_t oc20_rw_check_chunk_write(FemuCtrl *n, NvmeCmd *cmd,
     }
 #endif
 
-    if (start_sectr != cnk->wp) {
+    if (start_sectr != cnk->wp)
+    {
         return OC20_OUT_OF_ORDER_WRITE | NVME_DNR;
     }
 
@@ -304,25 +328,28 @@ static uint16_t oc20_rw_check_write_req(FemuCtrl *n, NvmeCmd *cmd,
     Oc20Namespace *lns = ns->state;
     Oc20AddrF *addrf = &lns->lbaf;
 
-    uint64_t lba = ((uint64_t *) req->slba)[0];
+    uint64_t lba = ((uint64_t *)req->slba)[0];
     uint64_t cidx = oc20_lba_to_chunk_index(n, ns, lba);
     uint32_t sectr = OC20_LBA_GET_SECTR(addrf, lba);
     uint16_t ws = 1;
 
-    for (uint16_t i = 1; i < req->nlb; i++) {
+    for (uint16_t i = 1; i < req->nlb; i++)
+    {
         uint64_t next_cidx;
-        uint64_t next_lba = ((uint64_t *) req->slba)[i];
+        uint64_t next_lba = ((uint64_t *)req->slba)[i];
 
         /* it is assumed that LBAs for different chunks are laid out
            contiguously and sorted with increasing addresses. */
         next_cidx = oc20_lba_to_chunk_index(n, ns, next_lba);
-        if (cidx != next_cidx) {
+        if (cidx != next_cidx)
+        {
             uint16_t err = oc20_rw_check_chunk_write(n, cmd, lba, ws, req);
-            if (err) {
+            if (err)
+            {
                 return err;
             }
 
-            lba = ((uint64_t *) req->slba)[i];
+            lba = ((uint64_t *)req->slba)[i];
             cidx = next_cidx;
             sectr = OC20_LBA_GET_SECTR(addrf, lba);
             ws = 1;
@@ -330,7 +357,8 @@ static uint16_t oc20_rw_check_write_req(FemuCtrl *n, NvmeCmd *cmd,
             continue;
         }
 
-        if (++sectr != OC20_LBA_GET_SECTR(addrf, next_lba)) {
+        if (++sectr != OC20_LBA_GET_SECTR(addrf, next_lba))
+        {
             return OC20_OUT_OF_ORDER_WRITE | NVME_DNR;
         }
 
@@ -352,7 +380,8 @@ static uint16_t oc20_rw_check_chunk_read(FemuCtrl *n, NvmeCmd *cmd,
     uint8_t state;
 
     Oc20CS *cnk = oc20_chunk_get_state(n, req->ns, lba);
-    if (!cnk) {
+    if (!cnk)
+    {
         return NVME_DULB;
     }
 
@@ -361,26 +390,32 @@ static uint16_t oc20_rw_check_chunk_read(FemuCtrl *n, NvmeCmd *cmd,
     wp = cnk->wp;
     state = cnk->state;
 
-    if (cnk->type == OC20_CHUNK_TYPE_RAN) {
+    if (cnk->type == OC20_CHUNK_TYPE_RAN)
+    {
         /* for OC20_CHUNK_TYPE_RAN it is sufficient to ensure that the chunk is
            OPEN and that we are reading a valid LBA */
-        if (state != OC20_CHUNK_OPEN || sectr >= cnk->cnlb) {
+        if (state != OC20_CHUNK_OPEN || sectr >= cnk->cnlb)
+        {
             return NVME_DULB;
         }
 
         return NVME_SUCCESS;
     }
 
-    if (state == OC20_CHUNK_CLOSED && sectr < wp) {
+    if (state == OC20_CHUNK_CLOSED && sectr < wp)
+    {
         return NVME_SUCCESS;
     }
 
-    if (state == OC20_CHUNK_OPEN) {
-        if (wp < mw_cunits) {
+    if (state == OC20_CHUNK_OPEN)
+    {
+        if (wp < mw_cunits)
+        {
             return NVME_DULB;
         }
 
-        if (sectr < (wp - mw_cunits)) {
+        if (sectr < (wp - mw_cunits))
+        {
             return NVME_SUCCESS;
         }
     }
@@ -393,10 +428,13 @@ static uint16_t oc20_rw_check_read_req(FemuCtrl *n, NvmeCmd *cmd,
 {
     uint16_t err;
 
-    for (int i = 0; i < req->nlb; i++) {
-        err = oc20_rw_check_chunk_read(n, cmd, req, ((uint64_t *) req->slba)[i]);
-        if (err) {
-            if (err & NVME_DULB) {
+    for (int i = 0; i < req->nlb; i++)
+    {
+        err = oc20_rw_check_chunk_read(n, cmd, req, ((uint64_t *)req->slba)[i]);
+        if (err)
+        {
+            if (err & NVME_DULB)
+            {
                 req->predef |= (1 << i);
                 continue;
             }
@@ -411,7 +449,8 @@ static uint16_t oc20_rw_check_read_req(FemuCtrl *n, NvmeCmd *cmd,
 static uint16_t oc20_rw_check_vector_req(FemuCtrl *n, NvmeCmd *cmd,
                                          NvmeRequest *req)
 {
-    if (req->is_write) {
+    if (req->is_write)
+    {
         return oc20_rw_check_write_req(n, cmd, req);
     }
 
@@ -428,31 +467,39 @@ static uint16_t oc20_chunk_set_free(FemuCtrl *n, NvmeNamespace *ns,
     uint32_t resetfail_prob = 0;
 
     chunk_meta = oc20_chunk_get_state(n, ns, lba);
-    if (!chunk_meta) {
+    if (!chunk_meta)
+    {
         return OC20_INVALID_RESET | NVME_DNR;
     }
 
-    if (lns->resetfail) {
+    if (lns->resetfail)
+    {
         resetfail_prob = lns->resetfail[oc20_lba_to_chunk_index(n, ns, lba)];
     }
 
-    if (resetfail_prob) {
-        if ((rand() % 100) < resetfail_prob) {
+    if (resetfail_prob)
+    {
+        if ((rand() % 100) < resetfail_prob)
+        {
             chunk_meta->state = OC20_CHUNK_OFFLINE;
             chunk_meta->wp = 0xffff;
             return OC20_INVALID_RESET | NVME_DNR;
         }
     }
 
-    if (chunk_meta->state & OC20_CHUNK_RESETABLE) {
-        switch (chunk_meta->state) {
+    if (chunk_meta->state & OC20_CHUNK_RESETABLE)
+    {
+        switch (chunk_meta->state)
+        {
         case OC20_CHUNK_FREE:
-            if (!(params->mccap & OC20_PARAMS_MCCAP_MULTIPLE_RESETS)) {
+            if (!(params->mccap & OC20_PARAMS_MCCAP_MULTIPLE_RESETS))
+            {
                 return OC20_INVALID_RESET | NVME_DNR;
             }
             break;
         case OC20_CHUNK_OPEN:
-            if (!(params->mccap & OC20_PARAMS_MCCAP_EARLY_RESET)) {
+            if (!(params->mccap & OC20_PARAMS_MCCAP_EARLY_RESET))
+            {
                 return OC20_INVALID_RESET | NVME_DNR;
             }
             break;
@@ -462,7 +509,8 @@ static uint16_t oc20_chunk_set_free(FemuCtrl *n, NvmeNamespace *ns,
         chunk_meta->wear_index++;
         chunk_meta->wp = 0;
 
-        if (mptr) {
+        if (mptr)
+        {
             nvme_addr_write(n, mptr, chunk_meta, sizeof(*chunk_meta));
         }
 
@@ -474,31 +522,38 @@ static uint16_t oc20_chunk_set_free(FemuCtrl *n, NvmeNamespace *ns,
 
 static uint16_t oc20_rw_check_req(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
 {
-    Oc20RwCmd *rw = (Oc20RwCmd *) cmd;
+    Oc20RwCmd *rw = (Oc20RwCmd *)cmd;
     Oc20Params *params = &n->params.oc20;
 
     uint16_t err;
-    uint16_t nlb  = le16_to_cpu(rw->nlb) + 1;
+    uint16_t nlb = le16_to_cpu(rw->nlb) + 1;
     uint64_t slba = le64_to_cpu(rw->lbal);
 
-    switch (rw->opcode) {
+    switch (rw->opcode)
+    {
     case NVME_CMD_WRITE:
-        if (nlb < params->ws_min || nlb % params->ws_min != 0) {
+        if (nlb < params->ws_min || nlb % params->ws_min != 0)
+        {
             return NVME_INVALID_FIELD | NVME_DNR;
         }
 
         err = oc20_rw_check_chunk_write(n, cmd, slba, nlb, req);
-        if (err) {
+        if (err)
+        {
             return err;
         }
         break;
     case NVME_CMD_READ:
-        for (int i = 0; i < nlb; i++) {
+        for (int i = 0; i < nlb; i++)
+        {
             err = oc20_rw_check_chunk_read(n, cmd, req, slba + i);
-            if (err) {
-                if (err & NVME_DULB) {
+            if (err)
+            {
+                if (err & NVME_DULB)
+                {
                     req->predef = slba + i;
-                    if (NVME_ERR_REC_DULBE(n->features.err_rec)) {
+                    if (NVME_ERR_REC_DULBE(n->features.err_rec))
+                    {
                         return NVME_DULB | NVME_DNR;
                     }
 
@@ -518,7 +573,8 @@ static uint16_t oc20_rw_check_req(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
 static unsigned get_unsigned(char *string, const char *key, unsigned int *value)
 {
     char *keyvalue = strstr(string, key);
-    if (!keyvalue) {
+    if (!keyvalue)
+    {
         return 0;
     }
     return sscanf(keyvalue + strlen(key), "%u", value);
@@ -527,15 +583,18 @@ static unsigned get_unsigned(char *string, const char *key, unsigned int *value)
 static int get_ch_lun_chk(char *chunkinfo, unsigned int *grp, unsigned int *lun,
                           unsigned int *chk)
 {
-    if (!get_unsigned(chunkinfo, "grp=", grp)) {
+    if (!get_unsigned(chunkinfo, "grp=", grp))
+    {
         return 0;
     }
 
-    if (!get_unsigned(chunkinfo, "pu=", lun)) {
+    if (!get_unsigned(chunkinfo, "pu=", lun))
+    {
         return 0;
     }
 
-    if (!get_unsigned(chunkinfo, "chk=", chk)) {
+    if (!get_unsigned(chunkinfo, "chk=", chk))
+    {
         return 0;
     }
 
@@ -549,15 +608,18 @@ static int get_chunk_meta_index(FemuCtrl *n, NvmeNamespace *ns,
     Oc20Namespace *lns = ns->state;
     Oc20IdGeo *geo = &lns->id_ctrl.geo;
 
-    if (chk >= geo->num_chk) {
+    if (chk >= geo->num_chk)
+    {
         return -1;
     }
 
-    if (lun >= geo->num_lun) {
+    if (lun >= geo->num_lun)
+    {
         return -1;
     }
 
-    if (grp >= geo->num_grp) {
+    if (grp >= geo->num_grp)
+    {
         return -1;
     }
 
@@ -570,20 +632,24 @@ static int set_resetfail_chunk(FemuCtrl *n, NvmeNamespace *ns, char *chunkinfo)
     unsigned int ch, lun, chk, resetfail_prob;
     int i;
 
-    if (!get_ch_lun_chk(chunkinfo, &ch, &lun, &chk)) {
+    if (!get_ch_lun_chk(chunkinfo, &ch, &lun, &chk))
+    {
         return 1;
     }
 
-    if (!get_unsigned(chunkinfo, "resetfail_prob=", &resetfail_prob)) {
+    if (!get_unsigned(chunkinfo, "resetfail_prob=", &resetfail_prob))
+    {
         return 1;
     }
 
-    if (resetfail_prob > 100) {
+    if (resetfail_prob > 100)
+    {
         return 1;
     }
 
     i = get_chunk_meta_index(n, ns, ch, lun, chk);
-    if (i < 0) {
+    if (i < 0)
+    {
         return 1;
     }
 
@@ -600,23 +666,28 @@ static int set_writefail_sector(FemuCtrl *n, NvmeNamespace *ns, char *secinfo)
     unsigned int ch, lun, chk, sec, writefail_prob;
     uint64_t lba;
 
-    if (!get_ch_lun_chk(secinfo, &ch, &lun, &chk)) {
+    if (!get_ch_lun_chk(secinfo, &ch, &lun, &chk))
+    {
         return 1;
     }
 
-    if (!get_unsigned(secinfo, "sec=", &sec)) {
+    if (!get_unsigned(secinfo, "sec=", &sec))
+    {
         return 1;
     }
 
-    if (sec >= geo->clba) {
+    if (sec >= geo->clba)
+    {
         return 1;
     }
 
-    if (!get_unsigned(secinfo, "writefail_prob=", &writefail_prob)) {
+    if (!get_unsigned(secinfo, "writefail_prob=", &writefail_prob))
+    {
         return 1;
     }
 
-    if (writefail_prob > 100) {
+    if (writefail_prob > 100)
+    {
         return 1;
     }
 
@@ -632,18 +703,22 @@ static int oc20_resetfail_load(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
     FILE *fp;
     char line[256];
 
-    if (!params->resetfail_fname) {
+    if (!params->resetfail_fname)
+    {
         return 0;
     }
 
     fp = fopen(params->resetfail_fname, "r");
-    if (!fp) {
+    if (!fp)
+    {
         femu_err("Could not open resetfail file");
         return 1;
     }
 
-    while (fgets(line, sizeof(line), fp)) {
-        if (set_resetfail_chunk(n, ns, line)) {
+    while (fgets(line, sizeof(line), fp))
+    {
+        if (set_resetfail_chunk(n, ns, line))
+        {
             femu_err("Could not parse resetfail line: %s", line);
             return 1;
         }
@@ -659,18 +734,22 @@ static int oc20_writefail_load(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
     FILE *fp;
     char line[256];
 
-    if (!params->writefail_fname) {
+    if (!params->writefail_fname)
+    {
         return 0;
     }
 
     fp = fopen(params->writefail_fname, "r");
-    if (!fp) {
+    if (!fp)
+    {
         femu_err("Could not open writefail file");
         return 1;
     }
 
-    while (fgets(line, sizeof(line), fp)) {
-        if (set_writefail_sector(n, ns, line)) {
+    while (fgets(line, sizeof(line), fp))
+    {
+        if (set_writefail_sector(n, ns, line))
+        {
             femu_err("Could not parse writefail line: %s", line);
             return 1;
         }
@@ -702,12 +781,13 @@ static uint16_t oc20_rw(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req, bool vector
     NvmeNamespace *ns = cmd_ns(n, cmd);
     uint64_t prp1 = le64_to_cpu(lrw->dptr.prp1);
     uint64_t prp2 = le64_to_cpu(lrw->dptr.prp2);
-    uint32_t nlb  = le16_to_cpu(lrw->nlb) + 1;
+    uint32_t nlb = le16_to_cpu(lrw->nlb) + 1;
     uint64_t lbal = le64_to_cpu(lrw->lbal);
     int lbads = NVME_ID_NS_LBADS(ns);
     uint16_t err;
 
-    if (nlb > OC20_CMD_MAX_LBAS) {
+    if (nlb > OC20_CMD_MAX_LBAS)
+    {
         nvme_set_error_page(n, req->sq->sqid, req->cqe.cid, NVME_INVALID_FIELD,
                             offsetof(Oc20RwCmd, lbal), 0, req->ns->id);
         return NVME_INVALID_FIELD | NVME_DNR;
@@ -718,32 +798,42 @@ static uint16_t oc20_rw(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req, bool vector
     req->slba = (uint64_t)g_malloc0(sizeof(uint64_t) * nlb);
     req->is_write = oc20_rw_is_write(req) ? true : false;
 
-    if (vector) {
-        if (nlb > 1) {
+    if (vector)
+    {
+        if (nlb > 1)
+        {
             uint32_t len = nlb * sizeof(uint64_t);
             nvme_addr_read(n, lbal, (void *)req->slba, len);
-        } else {
+        }
+        else
+        {
             ((uint64_t *)req->slba)[0] = lbal;
         }
-    } else { /* For SPDK quirks */
-        for (int i = 0; i < nlb; i++) {
+    }
+    else
+    { /* For SPDK quirks */
+        for (int i = 0; i < nlb; i++)
+        {
             ((uint64_t *)req->slba)[i] = lbal + i;
         }
     }
 
     err = oc20_rw_check_vector_req(n, cmd, req);
-    if (err) {
+    if (err)
+    {
         goto fail_free;
     }
 
-    if (nvme_map_prp(&req->qsg, &req->iov, prp1, prp2, nlb << lbads, n)) {
+    if (nvme_map_prp(&req->qsg, &req->iov, prp1, prp2, nlb << lbads, n))
+    {
         femu_err("%s,malformed prp\n", __func__);
         err = NVME_INVALID_FIELD | NVME_DNR;
         goto fail_free;
     }
 
     uint64_t aio_sector_list[OC20_CMD_MAX_LBAS];
-    for (int i = 0; i < nlb; i++) {
+    for (int i = 0; i < nlb; i++)
+    {
 #ifdef DEBUG_OC20
         pr_lba(lns, ((uint64_t *)req->slba)[i]);
 #endif
@@ -753,7 +843,8 @@ static uint16_t oc20_rw(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req, bool vector
 
     oc20_advance_status(n, ns, cmd, req);
 
-    if (req->is_write) {
+    if (req->is_write)
+    {
         oc20_advance_wp(n, ns, ((uint64_t *)req->slba)[0], nlb, req);
     }
 
@@ -771,13 +862,14 @@ static uint16_t oc20_identify(FemuCtrl *n, NvmeCmd *cmd)
     NvmeNamespace *ns;
     uint32_t nsid = le32_to_cpu(cmd->nsid);
 
-    if (unlikely(nsid == 0 || nsid > n->num_namespaces)) {
+    if (unlikely(nsid == 0 || nsid > n->num_namespaces))
+    {
         return NVME_INVALID_NSID | NVME_DNR;
     }
 
     ns = &n->namespaces[nsid - 1];
 
-    return oc20_dma_read(n, (uint8_t *) &((Oc20Namespace *)ns->state)->id_ctrl,
+    return oc20_dma_read(n, (uint8_t *)&((Oc20Namespace *)ns->state)->id_ctrl,
                          sizeof(Oc20NamespaceGeometry), cmd);
 }
 
@@ -791,26 +883,32 @@ static uint16_t oc20_erase(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
     req->nlb = nlb;
     req->slba = (uint64_t)g_malloc0(nlb * sizeof(uint64_t));
 
-    if (nlb > 1) {
-        nvme_addr_read(n, lbal, (void *) req->slba, nlb * sizeof(void *));
-    } else {
+    if (nlb > 1)
+    {
+        nvme_addr_read(n, lbal, (void *)req->slba, nlb * sizeof(void *));
+    }
+    else
+    {
         ((uint64_t *)req->slba)[0] = lbal;
     }
 
-    for (int i = 0; i < nlb; i++) {
+    for (int i = 0; i < nlb; i++)
+    {
         Oc20CS *cs;
-        if (NULL == (cs = oc20_chunk_get_state(n, req->ns, ((uint64_t *)
-                                                            req->slba)[i]))) {
+        if (NULL == (cs = oc20_chunk_get_state(n, req->ns, ((uint64_t *)req->slba)[i])))
+        {
             return OC20_INVALID_RESET;
         }
 
-        int err = oc20_chunk_set_free(n, req->ns, ((uint64_t *) req->slba)[i],
+        int err = oc20_chunk_set_free(n, req->ns, ((uint64_t *)req->slba)[i],
                                       mptr, req);
-        if (err) {
+        if (err)
+        {
             return err;
         }
 
-        if (mptr) {
+        if (mptr)
+        {
             mptr += sizeof(Oc20CS);
         }
     }
@@ -828,7 +926,8 @@ static uint16_t oc20_chunk_info(FemuCtrl *n, NvmeCmd *cmd, uint32_t buf_len,
     uint16_t ret;
 
     nsid = le32_to_cpu(cmd->nsid);
-    if (unlikely(nsid == 0 || nsid > n->num_namespaces)) {
+    if (unlikely(nsid == 0 || nsid > n->num_namespaces))
+    {
         abort();
         return NVME_INVALID_NSID | NVME_DNR;
     }
@@ -840,20 +939,23 @@ static uint16_t oc20_chunk_info(FemuCtrl *n, NvmeCmd *cmd, uint32_t buf_len,
     log_len = lns->chks_total * sizeof(Oc20CS);
     trans_len = MIN(log_len, buf_len);
 
-    if (unlikely(log_len < off + buf_len)) {
+    if (unlikely(log_len < off + buf_len))
+    {
         abort();
         return NVME_INVALID_FIELD | NVME_DNR;
     }
 
-    log_page = (uint8_t *) lns->chunk_info + off;
+    log_page = (uint8_t *)lns->chunk_info + off;
 
-    if (cmd->opcode == NVME_ADM_CMD_GET_LOG_PAGE) {
+    if (cmd->opcode == NVME_ADM_CMD_GET_LOG_PAGE)
+    {
         return oc20_dma_read(n, log_page, trans_len, cmd);
     }
 
     /* Coperd: TODO, set_log_page */
     ret = oc20_dma_write(n, log_page, trans_len, cmd);
-    if (ret) {
+    if (ret)
+    {
         return ret;
     }
 
@@ -862,6 +964,17 @@ static uint16_t oc20_chunk_info(FemuCtrl *n, NvmeCmd *cmd, uint32_t buf_len,
 
 static uint16_t oc20_get_log(FemuCtrl *n, NvmeCmd *cmd)
 {
+    printf("NVME_CMD_READ : %d\n", nvme_sum.NVME_READ);
+    printf("NVME_CMD_WRITE : %d\n", nvme_sum.NVME_WRITE);
+    printf("OC20_CMD_VECT_READ : %d\n", nvme_sum.OC20_VECT_READ);
+    printf("OC20_CMD_VECT_WRITE : %d\n", nvme_sum.OC20_VECT_WRITE);
+    printf("OC20_CMD_VECT_ERASE : %d\n", nvme_sum.OC20_VECT_ERASE);
+    printf("NVME_Request.nlb : %d\n", nvme_sum.NVME_Request.nlb);
+    printf("NVME_Request.nlb_same : %d\n", nvme_sum.NVME_Request.nlb_same);
+    printf("NVME_Request.meta_size : %d\n", nvme_sum.NVME_Request.meta_size);
+    // printf("NVME_Request.meta_size_same : %d\n", nvme_sum.NVME_Request.meta_size_same);
+    printf("NVMe_Cmd.nlb : %d\n", nvme_sum.NVMe_Cmd.nlb);
+
     uint32_t dw10 = le32_to_cpu(cmd->cdw10);
     uint32_t dw11 = le32_to_cpu(cmd->cdw11);
     uint32_t dw12 = le32_to_cpu(cmd->cdw12);
@@ -878,7 +991,8 @@ static uint16_t oc20_get_log(FemuCtrl *n, NvmeCmd *cmd)
     len = (((numdu << 16) | numdl) + 1) << 2;
     off = (lpou << 32ULL) | lpol;
 
-    switch (lid) {
+    switch (lid)
+    {
     case OC20_CHUNK_INFO:
         return oc20_chunk_info(n, cmd, len, off);
     default:
@@ -905,7 +1019,8 @@ static uint16_t oc20_set_log(FemuCtrl *n, NvmeCmd *cmd)
     len = (((numdu << 16) | numdl) + 1) << 2;
     off = (lpou << 32ULL) | lpol;
 
-    switch (lid) {
+    switch (lid)
+    {
     case OC20_CHUNK_INFO:
         return oc20_chunk_info(n, cmd, len, off);
     default:
@@ -915,7 +1030,8 @@ static uint16_t oc20_set_log(FemuCtrl *n, NvmeCmd *cmd)
 
 static uint16_t oc20_admin_cmd(FemuCtrl *n, NvmeCmd *cmd)
 {
-    switch (cmd->opcode) {
+    switch (cmd->opcode)
+    {
     case OC20_ADM_CMD_IDENTIFY:
         femu_debug("oc20_identify\n");
         return oc20_identify(n, cmd);
@@ -938,7 +1054,42 @@ static uint16_t oc20_nvme_rw(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
 static uint16_t oc20_io_cmd(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
                             NvmeRequest *req)
 {
-    switch (cmd->opcode) {
+    NvmeRwCmd *rw = (NvmeRwCmd *)cmd;
+    uint32_t nlb = le16_to_cpu(rw->nlb) + 1;
+
+    nvme_sum.NVMe_Cmd.nlb += nlb;
+
+    if (nvme_sum.NVME_Request.nlb == req->nlb)
+        nvme_sum.NVME_Request.nlb_same++;
+
+    nvme_sum.NVME_Request.nlb += req->nlb;
+
+    /* if (nvme_sum.NVME_Request.meta_size == req->meta_size)
+        nvme_sum.NVME_Request.meta_size_same++; */
+
+    nvme_sum.NVME_Request.meta_size += req->meta_size;
+
+    switch (cmd->opcode)
+    {
+    case NVME_CMD_READ:
+        nvme_sum.NVME_READ++;
+        break;
+    case NVME_CMD_WRITE:
+        nvme_sum.NVME_WRITE++;
+        break;
+    case OC20_CMD_VECT_READ:
+        nvme_sum.OC20_VECT_READ++;
+        break;
+    case OC20_CMD_VECT_WRITE:
+        nvme_sum.OC20_VECT_WRITE++;
+        break;
+    case OC20_CMD_VECT_ERASE:
+        nvme_sum.OC20_VECT_ERASE++;
+        break;
+    }
+
+    switch (cmd->opcode)
+    {
     case NVME_CMD_READ:
     case NVME_CMD_WRITE:
         /*
@@ -981,11 +1132,13 @@ static void oc20_nvme_ns_init_identify(FemuCtrl *n, NvmeIdNs *id_ns)
 
     /* Coperd: OC2.0, setup all supported LBA format, shouldn't hurt */
     ms_min = 8;
-    for (int i = 1; i < 16 && ms_min <= n->ms_max; i++) {
+    for (int i = 1; i < 16 && ms_min <= n->ms_max; i++)
+    {
         id_ns->lbaf[i].lbads = 12;
         id_ns->lbaf[i].ms = ms_min;
 
-        if (params->ms == ms_min) {
+        if (params->ms == ms_min)
+        {
             id_ns->flbas = i | (params->extended << 4);
         }
 
@@ -1003,7 +1156,8 @@ static void nvme_ns_init_predef(FemuCtrl *n, NvmeNamespace *ns)
 {
     uint8_t *pbuf = g_malloc(NVME_ID_NS_LBADS_BYTES(ns));
 
-    switch (n->params.dlfeat) {
+    switch (n->params.dlfeat)
+    {
     case 0x1:
         memset(pbuf, 0x00, NVME_ID_NS_LBADS_BYTES(ns));
         break;
@@ -1119,31 +1273,31 @@ static void femu_oc20_init_id_ctrl(FemuCtrl *n, NvmeNamespace *ns,
     /* Byte 3071-256: Reserved */
     /* Byte 3072-4095: Vendor Specific */
 
-    *ln = (Oc20NamespaceGeometry) {
+    *ln = (Oc20NamespaceGeometry){
         .ver.major = mjr,
         .ver.minor = mnr,
-        .lbaf = (Oc20IdLBAF) {
+        .lbaf = (Oc20IdLBAF){
             .grp_len = 32 - clz32(num_groups - 1),
             .lun_len = 32 - clz32(num_punits - 1),
             .chk_len = 32 - clz32(num_chunks - 1),
             .sec_len = 32 - clz32(num_secs_per_chunk - 1),
         },
         .mccap = mccap,
-        .wit   = wit,
-        .geo = (Oc20IdGeo) {
+        .wit = wit,
+        .geo = (Oc20IdGeo){
             .num_grp = num_groups,
             .num_lun = num_punits,
             .num_chk = num_chunks,
-            .clba    = num_secs_per_chunk,
+            .clba = num_secs_per_chunk,
         },
-        .wrt = (Oc20IdWrt) {
+        .wrt = (Oc20IdWrt){
             .ws_min = ws_min,
             .ws_opt = ws_opt,
             .mw_cunits = mw_cunits,
             .max_open_chks = max_open_chks,
             .max_open_punits = max_open_punits,
         },
-        .perf = (Oc20IdPerf) {
+        .perf = (Oc20IdPerf){
             .trdt = cpu_to_le32(trdt),
             .trdm = cpu_to_le32(trdm),
             .tprt = cpu_to_le32(twrt),
@@ -1190,17 +1344,18 @@ static int oc20_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
                                         ln->blk_hdr.sector_size);
     lns->chunk_info = g_malloc0(lns->chunkinfo_size);
     ns->ns_blks = nvme_ns_calc_blks(n, ns) - (2 + lns->chunkinfo_size /
-                                              NVME_ID_NS_LBADS_BYTES(ns));
+                                                      NVME_ID_NS_LBADS_BYTES(ns));
 
     ns->blk.predef = ns->blk.begin + sizeof(Oc20NamespaceGeometry) +
-        lns->chunkinfo_size + NVME_ID_NS_LBADS_BYTES(ns);
+                     lns->chunkinfo_size + NVME_ID_NS_LBADS_BYTES(ns);
     ns->blk.data = ns->blk.begin + (2 * NVME_ID_NS_LBADS_BYTES(ns)) +
-        lns->chunkinfo_size;
+                   lns->chunkinfo_size;
     ns->blk.meta = ns->blk.data + NVME_ID_NS_LBADS_BYTES(ns) * ns->ns_blks;
 
     nvme_ns_init_predef(n, ns);
 
-    if (params->early_reset) {
+    if (params->early_reset)
+    {
         params->mccap |= OC20_PARAMS_MCCAP_EARLY_RESET;
     }
 
@@ -1208,11 +1363,11 @@ static int oc20_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
 
     /* calculated values */
     lns->chks_per_grp = id_geo->num_chk * id_geo->num_lun;
-    lns->chks_total   = lns->chks_per_grp * id_geo->num_grp;
+    lns->chks_total = lns->chks_per_grp * id_geo->num_grp;
     lns->secs_per_chk = id_geo->clba;
     lns->secs_per_lun = lns->secs_per_chk * id_geo->num_chk;
     lns->secs_per_grp = lns->secs_per_lun * id_geo->num_lun;
-    lns->secs_total   = lns->secs_per_grp * id_geo->clba;
+    lns->secs_total = lns->secs_per_grp * id_geo->clba;
 
     /* Address format: GRP | LUN | CHK | SEC */
     lbaf->sec_offset = 0;
@@ -1232,24 +1387,29 @@ static int oc20_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
         1ULL << (id_ctrl->lbaf.sec_len + id_ctrl->lbaf.chk_len +
                  id_ctrl->lbaf.lun_len + id_ctrl->lbaf.grp_len);
 
-    if (oc20_init_chunk_info(lns)) {
+    if (oc20_init_chunk_info(lns))
+    {
         femu_err("Could not load chunk info");
         return 1;
     }
 
     lns->resetfail = NULL;
-    if (params->resetfail_fname) {
+    if (params->resetfail_fname)
+    {
         lns->resetfail = g_malloc0_n(lns->chks_total, sizeof(*lns->resetfail));
-        if (oc20_resetfail_load(n, ns, errp)) {
+        if (oc20_resetfail_load(n, ns, errp))
+        {
             return 1;
         }
     }
 
     lns->writefail = NULL;
-    if (params->writefail_fname) {
+    if (params->writefail_fname)
+    {
         abort();
         lns->writefail = g_malloc0_n(ns->ns_blks, sizeof(*lns->writefail));
-        if (oc20_writefail_load(n, ns, errp)) {
+        if (oc20_writefail_load(n, ns, errp))
+        {
             return 1;
         }
 
@@ -1257,7 +1417,8 @@ static int oc20_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
          * We fail resets for a chunk after a write failure to it, so make sure
          * to allocate the resetfailure buffer if it has not been already
          */
-        if (!lns->resetfail) {
+        if (!lns->resetfail)
+        {
             lns->resetfail = g_malloc0_n(lns->chks_total, sizeof(*lns->resetfail));
         }
     }
@@ -1269,7 +1430,7 @@ static int oc20_init_namespaces(FemuCtrl *n, Error **errp)
 {
     Oc20Ctrl *ln = n->ext_ops.state;
 
-    ln->blk_hdr = (Oc20Header) {
+    ln->blk_hdr = (Oc20Header){
         .magic = OC20_MAGIC,
         .version = 0x1,
         .num_namespaces = 1,
@@ -1278,13 +1439,15 @@ static int oc20_init_namespaces(FemuCtrl *n, Error **errp)
         .md_size = 16,
     };
 
-    for (int i = 0; i < n->num_namespaces; i++) {
+    for (int i = 0; i < n->num_namespaces; i++)
+    {
         NvmeNamespace *ns = &n->namespaces[i];
         NvmeIdNs *id_ns = &ns->id_ns;
         id_ns->vs[0] = 0x1;
         ns->blk.begin = ln->blk_hdr.sector_size + i * ln->blk_hdr.ns_size;
 
-        if (oc20_init_namespace(n, ns, errp)) {
+        if (oc20_init_namespace(n, ns, errp))
+        {
             return 1;
         }
     }
@@ -1305,12 +1468,14 @@ static void oc20_release_locks(FemuCtrl *n)
 {
     int ret;
 
-    for (int i = 0; i < FEMU_MAX_NUM_CHNLS; i++) {
+    for (int i = 0; i < FEMU_MAX_NUM_CHNLS; i++)
+    {
         ret = pthread_spin_destroy(&n->chnl_locks[i]);
         assert(ret == 0);
     }
 
-    for (int i = 0; i < FEMU_MAX_NUM_CHIPS; i++) {
+    for (int i = 0; i < FEMU_MAX_NUM_CHIPS; i++)
+    {
         ret = pthread_spin_destroy(&n->chip_locks[i]);
         assert(ret == 0);
     }
@@ -1320,9 +1485,10 @@ static int oc20_init_misc(FemuCtrl *n)
 {
     int ret;
 
-	set_latency(n);
+    set_latency(n);
 
-    for (int i = 0; i < FEMU_MAX_NUM_CHNLS; i++) {
+    for (int i = 0; i < FEMU_MAX_NUM_CHNLS; i++)
+    {
         n->chnl_next_avail_time[i] = 0;
 
         /* FIXME: Can we use PTHREAD_PROCESS_PRIVATE here? */
@@ -1330,7 +1496,8 @@ static int oc20_init_misc(FemuCtrl *n)
         assert(ret == 0);
     }
 
-    for (int i = 0; i < FEMU_MAX_NUM_CHIPS; i++) {
+    for (int i = 0; i < FEMU_MAX_NUM_CHIPS; i++)
+    {
         n->chip_next_avail_time[i] = 0;
 
         /* FIXME: Can we use PTHREAD_PROCESS_PRIVATE here? */
@@ -1352,7 +1519,8 @@ static void oc20_init(FemuCtrl *n, Error **errp)
 
 static void oc20_exit(FemuCtrl *n)
 {
-    for (int i = 0; i < n->num_namespaces; i++) {
+    for (int i = 0; i < n->num_namespaces; i++)
+    {
         NvmeNamespace *ns = &n->namespaces[i];
         oc20_free_namespace(n, ns);
     }
@@ -1363,16 +1531,15 @@ static void oc20_exit(FemuCtrl *n)
 int nvme_register_ocssd20(FemuCtrl *n)
 {
     Oc20Ctrl *ln = g_malloc0(sizeof(Oc20Ctrl));
-    n->ext_ops = (FemuExtCtrlOps) {
-        .state            = ln,
-        .init             = oc20_init,
-        .exit             = oc20_exit,
-        .rw_check_req     = oc20_rw_check_req,
-        .admin_cmd        = oc20_admin_cmd,
-        .io_cmd           = oc20_io_cmd,
-        .get_log          = oc20_get_log,
+    n->ext_ops = (FemuExtCtrlOps){
+        .state = ln,
+        .init = oc20_init,
+        .exit = oc20_exit,
+        .rw_check_req = oc20_rw_check_req,
+        .admin_cmd = oc20_admin_cmd,
+        .io_cmd = oc20_io_cmd,
+        .get_log = oc20_get_log,
     };
 
     return 0;
 }
-
