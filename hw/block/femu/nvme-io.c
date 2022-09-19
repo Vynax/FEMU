@@ -491,6 +491,8 @@ static uint16_t nvme_io_cmd(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
 
     req->ns = ns = &n->namespaces[nsid - 1];
 
+    // printf("nvme_io_cmd cmd->opcode:%u\n", cmd->opcode);
+
     switch (cmd->opcode) {
     case NVME_CMD_FLUSH:
         if (!n->id_ctrl.vwc || !n->features.volatile_wc) {
